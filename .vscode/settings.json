@@ -1,0 +1,13 @@
+{
+    // Prettier is the only formatter — VS Code's built-in TypeScript formatter
+    // adds semicolons, which fights `.prettierrc` ("semi": false) and the
+    // eslint `semi: never` rule.
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.formatOnSave": true,
+    "[typescript]": { "editor.defaultFormatter": "esbenp.prettier-vscode" },
+    "[javascript]": { "editor.defaultFormatter": "esbenp.prettier-vscode" },
+    "[json]": { "editor.defaultFormatter": "esbenp.prettier-vscode" },
+
+    // Apply eslint fixes (import ordering, type-import style) on save.
+    "editor.codeActionsOnSave": { "source.fixAll.eslint": "explicit" }
+}

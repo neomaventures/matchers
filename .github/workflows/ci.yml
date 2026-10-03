@@ -1,0 +1,75 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+    branches: [main]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+
+  publish:
+    needs: verify
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # Required for npm trusted publishing. The npm CLI exchanges this OIDC
+      # token for publish rights, so there is no NPM_TOKEN secret, and npm
+      # generates the provenance attestation automatically.
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          registry-url: https://registry.npmjs.org
+          cache: pnpm
+
+      # setup-node writes `//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}`
+      # into the npmrc. With trusted publishing there is no token, so that line
+      # expands to an empty value — and npm treats "auth is configured" as true,
+      # never starting the OIDC exchange, then fails with ENEEDAUTH. Keep
+      # registry-url (npm needs the registry) and drop the auth line.
+      # See https://github.com/npm/documentation/issues/1960
+      - name: Drop the empty auth line so npm falls back to OIDC
+        run: |
+          npm --version
+          sed -i '/_authToken/d' "${NPM_CONFIG_USERCONFIG:-$HOME/.npmrc}"
+
+      - run: pnpm install --frozen-lockfile
+
+      # The tag is the source of truth for what gets published. If it doesn't
+      # match package.json, something was bumped or tagged by hand — fail
+      # rather than publish a version nobody meant to release.
+      - name: Verify tag matches package.json
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          PKG="$(node -p "require('./package.json').version")"
+          [ "$TAG" = "$PKG" ] || {
+            echo "Tag v$TAG does not match package.json $PKG"
+            exit 1
+          }
+
+      - run: pnpm build
+
+      # Bare `npm publish` — trusted publishing requires npm >= 11.5.1, which
+      # ships with the Node version pinned in .nvmrc. No token, no flags: the
+      # CLI detects the OIDC environment, and `publishConfig.access` in
+      # package.json already marks the scoped package public.
+      - run: npm publish

@@ -1,0 +1,15 @@
+{
+  "singleQuote": false,
+  "semi": false,
+  "trailingComma": "all",
+  "printWidth": 80,
+  "overrides": [
+    {
+      "files": ["*.ejs"],
+      "options": {
+        "parser": "html",
+        "plugins": ["prettier-plugin-tailwindcss"]
+      }
+    }
+  ]
+}

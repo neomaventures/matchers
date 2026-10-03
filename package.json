@@ -1,0 +1,71 @@
+{
+  "name": "@neomaventures/matchers",
+  "version": "0.1.0",
+  "description": "Custom Jest matchers, self-registering via setupFilesAfterEnv.",
+  "author": "Daniel Bruce",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/neomaventures/matchers.git"
+  },
+  "bugs": {
+    "url": "https://github.com/neomaventures/matchers/issues"
+  },
+  "homepage": "https://github.com/neomaventures/matchers#readme",
+  "keywords": [
+    "jest",
+    "matchers",
+    "testing",
+    "expect",
+    "typescript"
+  ],
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
+  "packageManager": "pnpm@10.5.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "!**/*.json",
+    "!**/*.tsbuildinfo"
+  ],
+  "scripts": {
+    "build": "tsc -p ./tsconfig.lib.json",
+    "test": "jest --runInBand",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "pnpm build"
+  },
+  "dependencies": {
+    "jest-matcher-utils": "^30.0.0"
+  },
+  "peerDependencies": {
+    "jest": ">=29"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@swc/core": "^1.12.1",
+    "@swc/jest": "^0.2.39",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^25.5.2",
+    "eslint": "^10.2.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-import-x": "^4.16.2",
+    "eslint-plugin-jest": "^29.15.3",
+    "eslint-plugin-jest-extended": "^3.0.1",
+    "eslint-plugin-prettier": "^5.5.5",
+    "eslint-plugin-yml": "^3.3.2",
+    "globals": "^17.4.0",
+    "jest": "^30.3.0",
+    "jest-extended": "^7.0.0",
+    "prettier": "^3.4.2",
+    "typescript": "^6.0.2",
+    "typescript-eslint": "^8.58.0"
+  }
+}
