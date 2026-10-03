@@ -1,7 +1,7 @@
 {
   "name": "@neomaventures/matchers",
   "version": "0.1.0",
-  "description": "Custom Jest matchers, self-registering via setupFilesAfterEnv.",
+  "description": "Jest matchers for asserting an error's class and its properties in one assertion \u2014 toThrowMatching and toMatchError.",
   "author": "Daniel Bruce",
   "repository": {
     "type": "git",
@@ -16,6 +16,9 @@
     "matchers",
     "testing",
     "expect",
+    "assertions",
+    "error",
+    "throw",
     "typescript"
   ],
   "license": "MIT",
