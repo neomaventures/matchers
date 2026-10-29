@@ -12,6 +12,19 @@ class TestError extends Error {
   }
 }
 
+class RawError extends Error {}
+
+class OtherError extends Error {}
+
+class PublicError extends Error {
+  public constructor(
+    public readonly reason: string,
+    cause?: Error,
+  ) {
+    super("public", { cause })
+  }
+}
+
 describe("toThrowMatching", () => {
   it("should pass when function throws the expected error class", () => {
     expect(() => {
@@ -227,5 +240,105 @@ describe("toMatchError", () => {
       }).toThrow(/details/)
     })
     /* eslint-enable jest/max-expects */
+  })
+})
+
+describe("pass and fail outcomes", () => {
+  const error = new PublicError(
+    "access-lost",
+    new OtherError("downstream said no"),
+  )
+
+  const passing: [string, unknown, new (...args: any[]) => Error, object?][] = [
+    ["the class alone", error, PublicError, undefined],
+    ["a base class", error, Error, undefined],
+    ["no properties", error, PublicError, {}],
+    ["one matching property", error, PublicError, { reason: "access-lost" }],
+    [
+      "every property matching",
+      error,
+      PublicError,
+      { reason: "access-lost", message: "public" },
+    ],
+    [
+      "a cause matching expect.any",
+      error,
+      PublicError,
+      { cause: expect.any(OtherError) },
+    ],
+    [
+      "a cause equal to an error",
+      error,
+      PublicError,
+      { cause: new OtherError("downstream said no") },
+    ],
+    [
+      "a property matching expect.stringMatching",
+      error,
+      PublicError,
+      { reason: expect.stringMatching(/^access/) },
+    ],
+  ]
+
+  const failing: [string, unknown, new (...args: any[]) => Error, object?][] = [
+    ["another class", new OtherError("boom"), PublicError, undefined],
+    ["a base class instance", new Error("boom"), PublicError, undefined],
+    ["a string", "boom", PublicError, undefined],
+    ["undefined", undefined, PublicError, undefined],
+    ["a plain object", { reason: "access-lost" }, PublicError, undefined],
+    ["one mismatched property", error, PublicError, { reason: "quota" }],
+    [
+      "every property mismatched",
+      error,
+      PublicError,
+      { reason: "quota", message: "nope" },
+    ],
+    [
+      "one of two properties mismatched",
+      error,
+      PublicError,
+      { reason: "access-lost", message: "nope" },
+    ],
+    ["an absent property", error, PublicError, { code: "ERR" }],
+    [
+      "a cause not matching expect.any",
+      error,
+      PublicError,
+      { cause: expect.any(RawError) },
+    ],
+    [
+      "a cause not equal to an error",
+      error,
+      PublicError,
+      { cause: new RawError("x") },
+    ],
+  ]
+
+  describe("toMatchError", () => {
+    it.each(passing)("should pass given %s", (_, subject, Class, props) => {
+      expect(subject).toMatchError(Class, props)
+    })
+
+    it.each(failing)("should fail given %s", (_, subject, Class, props) => {
+      expect(subject).not.toMatchError(Class, props)
+    })
+  })
+
+  describe("toThrowMatching", () => {
+    it.each(passing)("should pass given %s", (_, thrown, Class, props) => {
+      expect(() => {
+        throw thrown
+      }).toThrowMatching(Class, props)
+    })
+
+    it.each(failing)("should fail given %s", (_, thrown, Class, props) => {
+      expect(() => {
+        throw thrown
+      }).not.toThrowMatching(Class, props)
+    })
+
+    it("should fail given a function that does not throw", () => {
+      expect(() => {}).not.toThrowMatching(PublicError)
+    })
   })
 })
