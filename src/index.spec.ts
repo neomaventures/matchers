@@ -597,6 +597,14 @@ describe("toMatchError", () => {
       ])
     })
 
+    it("should say when the expected class is anonymous", () => {
+      expect(
+        failureMessage(() => {
+          expect(new TestError("ERR")).toMatchError(AnonymousError)
+        }),
+      ).toInclude("Expected: an instance of an anonymous class")
+    })
+
     it("should report a property whose getter throws as mismatched", () => {
       expect(
         failureMessage(() => {

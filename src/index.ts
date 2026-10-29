@@ -5,6 +5,9 @@ type ErrorClass = new (...args: any[]) => Error
 const className = (value: Error): string =>
   value.constructor?.name || value.name || "Error"
 
+const expectedName = (ErrorClass: ErrorClass): string =>
+  ErrorClass.name || "an anonymous class"
+
 const printable = (value: unknown): unknown =>
   value instanceof Error
     ? Object.create(Object.getPrototypeOf(value) as object | null, {
@@ -102,7 +105,7 @@ const checkErrorInstance = (
       pass: false,
       message: () =>
         `${hintFor(context, matcherName, expectedProps)}\n\n` +
-        `Expected: an instance of ${EXPECTED_COLOR(ErrorClass.name)}\n` +
+        `Expected: an instance of ${EXPECTED_COLOR(expectedName(ErrorClass))}\n` +
         describeReceived(context, subject),
     }
   }
@@ -112,7 +115,7 @@ const checkErrorInstance = (
       pass: true,
       message: () =>
         `${hintFor(context, matcherName, expectedProps)}\n\n` +
-        `Expected: not an instance of ${EXPECTED_COLOR(ErrorClass.name)}\n` +
+        `Expected: not an instance of ${EXPECTED_COLOR(expectedName(ErrorClass))}\n` +
         describeReceived(context, subject),
     }
   }
@@ -134,7 +137,7 @@ const checkErrorInstance = (
     pass: true,
     message: () =>
       `${hintFor(context, matcherName, expectedProps)}\n\n` +
-      `Expected: not an instance of ${EXPECTED_COLOR(ErrorClass.name)} with properties ${context.utils.printExpected(
+      `Expected: not an instance of ${EXPECTED_COLOR(expectedName(ErrorClass))} with properties ${context.utils.printExpected(
         Object.fromEntries(
           Object.entries(expectedProps).map(([key, value]) => [
             key,
@@ -166,7 +169,7 @@ function toThrowMatching(
     return {
       pass: false,
       message: () =>
-        `Expected function to throw ${EXPECTED_COLOR(ErrorClass.name)}, but it did not throw`,
+        `Expected function to throw ${EXPECTED_COLOR(expectedName(ErrorClass))}, but it did not throw`,
     }
   } catch (e) {
     return checkErrorInstance(
