@@ -554,6 +554,13 @@ describe("toMatchError", () => {
         ])
       })
 
+      it("should match an error cause against an asymmetric matcher", () => {
+        const error = new Error("sync failed", { cause: new TestError("ERR") })
+        expect({ error }).toEqual({
+          error: expect.toMatchError(Error, { cause: expect.any(TestError) }),
+        })
+      })
+
       /* eslint-disable jest/max-expects --
        * Matcher failure-mode tests: the outer expect captures the
        * AssertionError raised by the expectation the matcher is nested in.
@@ -588,6 +595,15 @@ describe("toMatchError", () => {
             error: expect.toMatchError(TestError, {
               inner: expect.any(TestError),
             }),
+          })
+        }).toThrow(/toEqual/)
+      })
+
+      it("should fail when the error cause does not match its asymmetric matcher", () => {
+        const error = new Error("sync failed", { cause: new Error("other") })
+        expect(() => {
+          expect({ error }).toEqual({
+            error: expect.toMatchError(Error, { cause: expect.any(TestError) }),
           })
         }).toThrow(/toEqual/)
       })
