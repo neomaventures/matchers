@@ -20,11 +20,11 @@ const describeReceived = (
   const { printReceived } = context.utils
 
   if (!(subject instanceof Error)) {
-    return `Received value: ${printReceived(subject)}`
+    return `Received: ${printReceived(subject)}`
   }
 
   const lines = [
-    `Received class: ${RECEIVED_COLOR(className(subject))}`,
+    `Received: an instance of ${RECEIVED_COLOR(className(subject))}`,
     `Received message: ${printReceived(subject.message)}`,
   ]
   if (subject.cause !== undefined) {
@@ -72,10 +72,10 @@ const describeMismatch = (
   }
 
   const lines = [
-    `Received ${RECEIVED_COLOR(className(subject))} has mismatched properties: ${mismatched.join(", ")}`,
+    `Received ${RECEIVED_COLOR(className(subject))} has mismatched properties: ${mismatched.sort().join(", ")}`,
   ]
   if (unreadable.length > 0) {
-    lines.push(`Threw when compared: ${unreadable.join(", ")}`)
+    lines.push(`Threw when compared: ${unreadable.sort().join(", ")}`)
   }
   return (
     lines.join("\n") +
@@ -102,7 +102,7 @@ const checkErrorInstance = (
       pass: false,
       message: () =>
         `${hintFor(context, matcherName, expectedProps)}\n\n` +
-        `Expected class: ${EXPECTED_COLOR(ErrorClass.name)}\n` +
+        `Expected: an instance of ${EXPECTED_COLOR(ErrorClass.name)}\n` +
         describeReceived(context, subject),
     }
   }
@@ -113,7 +113,7 @@ const checkErrorInstance = (
       message: () =>
         `${hintFor(context, matcherName, expectedProps)}\n\n` +
         `Expected: not an instance of ${EXPECTED_COLOR(ErrorClass.name)}\n` +
-        `Received: ${context.utils.printReceived(printable(subject))}`,
+        describeReceived(context, subject),
     }
   }
 
@@ -142,8 +142,8 @@ const checkErrorInstance = (
           ]),
         ),
       )}\n` +
-      `Received: ${context.utils.printReceived(printable(subject))}\n` +
-      `Matched properties: ${Object.keys(expectedProps).join(", ")}`,
+      describeReceived(context, subject) +
+      `\nMatched properties: ${Object.keys(expectedProps).sort().join(", ")}`,
   }
 }
 

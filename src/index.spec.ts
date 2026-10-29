@@ -90,7 +90,9 @@ describe("toThrowMatching", () => {
       expect(() => {
         throw new Error("wrong")
       }).toThrowMatching(TestError)
-    }).toThrow(/Expected class: .*TestError[\s\S]*Received class: .*Error/)
+    }).toThrow(
+      /Expected: an instance of .*TestError[\s\S]*Received: an instance of .*Error/,
+    )
   })
 
   it("should fail when function does not throw", () => {
@@ -238,7 +240,7 @@ describe("toThrowMatching", () => {
           }).toThrowMatching(PublicError, { reason: "quota", message: "nope" })
         }),
       ).toIncludeMultiple([
-        "Received PublicError has mismatched properties: reason, message",
+        "Received PublicError has mismatched properties: message, reason",
         '-   "reason": "quota",',
         '+   "reason": "access-lost",',
         '-   "message": "nope",',
@@ -270,8 +272,8 @@ describe("toThrowMatching", () => {
           }).toThrowMatching(PublicError)
         }),
       ).toIncludeMultiple([
-        "Expected class: PublicError",
-        "Received class: OtherError",
+        "Expected: an instance of PublicError",
+        "Received: an instance of OtherError",
         'Received message: "boom"',
       ])
     })
@@ -287,13 +289,9 @@ describe("toThrowMatching", () => {
     })
 
     it.each([
-      ["a string", "boom", 'Received value: "boom"'],
-      ["undefined", undefined, "Received value: undefined"],
-      [
-        "a plain object",
-        { reason: "quota" },
-        'Received value: {"reason": "quota"}',
-      ],
+      ["a string", "boom", 'Received: "boom"'],
+      ["undefined", undefined, "Received: undefined"],
+      ["a plain object", { reason: "quota" }, 'Received: {"reason": "quota"}'],
     ])("should show the received value when given %s", (_, subject, shown) => {
       expect(
         failureMessage(() => {
@@ -301,7 +299,7 @@ describe("toThrowMatching", () => {
             throw subject
           }).toThrowMatching(PublicError)
         }),
-      ).toIncludeMultiple(["Expected class: PublicError", shown])
+      ).toIncludeMultiple(["Expected: an instance of PublicError", shown])
     })
 
     it("should fall back to the error's name when its constructor is undefined", () => {
@@ -312,7 +310,7 @@ describe("toThrowMatching", () => {
           }).toThrowMatching(OtherError)
         }),
       ).toIncludeMultiple([
-        "Received class: Error",
+        "Received: an instance of Error",
         'Received message: "public"',
       ])
     })
@@ -324,7 +322,10 @@ describe("toThrowMatching", () => {
             throw new AnonymousError("anon")
           }).toThrowMatching(PublicError)
         }),
-      ).toIncludeMultiple(["Received class: Error", 'Received message: "anon"'])
+      ).toIncludeMultiple([
+        "Received: an instance of Error",
+        'Received message: "anon"',
+      ])
     })
 
     it("should report a property whose getter throws as mismatched", () => {
@@ -335,7 +336,7 @@ describe("toThrowMatching", () => {
           }).toThrowMatching(PublicError, { reason: "zzz", boom: 1 })
         }),
       ).toIncludeMultiple([
-        "has mismatched properties: reason, boom",
+        "has mismatched properties: boom, reason",
         "Threw when compared: boom",
         '+   "boom": [Error: getter threw],',
       ])
@@ -354,8 +355,8 @@ describe("toThrowMatching", () => {
       ).toIncludeMultiple([
         "expect(received).not.toThrowMatching(ErrorClass, properties)",
         'Expected: not an instance of PublicError with properties {"cause": Any<OtherError>, "reason": "access-lost"}',
-        "Received: [PublicError: public]",
-        "Matched properties: reason, cause",
+        "Received: an instance of PublicError",
+        "Matched properties: cause, reason",
       ])
     })
 
@@ -368,7 +369,9 @@ describe("toThrowMatching", () => {
         }),
       ).toIncludeMultiple([
         "Expected: not an instance of PublicError",
-        "Received: [PublicError: public]",
+        "Received: an instance of PublicError",
+        'Received message: "public"',
+        "Received cause: [OtherError: downstream said no]",
       ])
     })
   })
@@ -393,7 +396,9 @@ describe("toMatchError", () => {
   it("should fail when error is not the expected class", () => {
     expect(() => {
       expect(new Error("wrong")).toMatchError(TestError)
-    }).toThrow(/Expected class: .*TestError[\s\S]*Received class: .*Error/)
+    }).toThrow(
+      /Expected: an instance of .*TestError[\s\S]*Received: an instance of .*Error/,
+    )
   })
 
   it("should reject function subjects with a clear error", () => {
@@ -514,7 +519,7 @@ describe("toMatchError", () => {
           })
         }),
       ).toIncludeMultiple([
-        "Received PublicError has mismatched properties: reason, message",
+        "Received PublicError has mismatched properties: message, reason",
         '-   "reason": "quota",',
         '+   "reason": "access-lost",',
         '-   "message": "nope",',
@@ -542,8 +547,8 @@ describe("toMatchError", () => {
           expect(new OtherError("boom")).toMatchError(PublicError)
         }),
       ).toIncludeMultiple([
-        "Expected class: PublicError",
-        "Received class: OtherError",
+        "Expected: an instance of PublicError",
+        "Received: an instance of OtherError",
         'Received message: "boom"',
       ])
     })
@@ -559,19 +564,15 @@ describe("toMatchError", () => {
     })
 
     it.each([
-      ["a string", "boom", 'Received value: "boom"'],
-      ["undefined", undefined, "Received value: undefined"],
-      [
-        "a plain object",
-        { reason: "quota" },
-        'Received value: {"reason": "quota"}',
-      ],
+      ["a string", "boom", 'Received: "boom"'],
+      ["undefined", undefined, "Received: undefined"],
+      ["a plain object", { reason: "quota" }, 'Received: {"reason": "quota"}'],
     ])("should show the received value when given %s", (_, subject, shown) => {
       expect(
         failureMessage(() => {
           expect(subject).toMatchError(PublicError)
         }),
-      ).toIncludeMultiple(["Expected class: PublicError", shown])
+      ).toIncludeMultiple(["Expected: an instance of PublicError", shown])
     })
 
     it("should fall back to the error's name when its constructor is undefined", () => {
@@ -580,7 +581,7 @@ describe("toMatchError", () => {
           expect(withoutConstructor).toMatchError(OtherError)
         }),
       ).toIncludeMultiple([
-        "Received class: Error",
+        "Received: an instance of Error",
         'Received message: "public"',
       ])
     })
@@ -590,7 +591,10 @@ describe("toMatchError", () => {
         failureMessage(() => {
           expect(new AnonymousError("anon")).toMatchError(PublicError)
         }),
-      ).toIncludeMultiple(["Received class: Error", 'Received message: "anon"'])
+      ).toIncludeMultiple([
+        "Received: an instance of Error",
+        'Received message: "anon"',
+      ])
     })
 
     it("should report a property whose getter throws as mismatched", () => {
@@ -602,7 +606,7 @@ describe("toMatchError", () => {
           })
         }),
       ).toIncludeMultiple([
-        "has mismatched properties: reason, boom",
+        "has mismatched properties: boom, reason",
         "Threw when compared: boom",
         '+   "boom": [Error: getter threw],',
       ])
@@ -619,8 +623,8 @@ describe("toMatchError", () => {
       ).toIncludeMultiple([
         "expect(received).not.toMatchError(ErrorClass, properties)",
         'Expected: not an instance of PublicError with properties {"cause": Any<OtherError>, "reason": "access-lost"}',
-        "Received: [PublicError: public]",
-        "Matched properties: reason, cause",
+        "Received: an instance of PublicError",
+        "Matched properties: cause, reason",
       ])
     })
 
@@ -631,7 +635,9 @@ describe("toMatchError", () => {
         }),
       ).toIncludeMultiple([
         "Expected: not an instance of PublicError",
-        "Received: [PublicError: public]",
+        "Received: an instance of PublicError",
+        'Received message: "public"',
+        "Received cause: [OtherError: downstream said no]",
       ])
     })
   })
