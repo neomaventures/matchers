@@ -2,21 +2,16 @@ import { EXPECTED_COLOR, RECEIVED_COLOR } from "jest-matcher-utils"
 
 type ErrorClass = new (...args: any[]) => Error
 
-const printable = (value: unknown): unknown => {
-  if (!(value instanceof Error)) {
-    return value
-  }
+const className = (value: Error): string =>
+  value.constructor?.name || value.name || "Error"
 
-  const copy = Object.assign(
-    Object.create(Object.getPrototypeOf(value) as object) as Error,
-    value,
-  )
-  Object.defineProperties(copy, {
-    name: { value: value.constructor.name },
-    message: { value: value.message },
-  })
-  return copy
-}
+const printable = (value: unknown): unknown =>
+  value instanceof Error
+    ? Object.create(Object.getPrototypeOf(value) as object | null, {
+        name: { value: className(value) },
+        message: { value: value.message },
+      })
+    : value
 
 const describeReceived = (
   context: jest.MatcherContext,
@@ -29,13 +24,70 @@ const describeReceived = (
   }
 
   const lines = [
-    `Received class: ${RECEIVED_COLOR(subject.constructor.name)}`,
+    `Received class: ${RECEIVED_COLOR(className(subject))}`,
     `Received message: ${printReceived(subject.message)}`,
   ]
   if (subject.cause !== undefined) {
     lines.push(`Received cause: ${printReceived(printable(subject.cause))}`)
   }
   return lines.join("\n")
+}
+
+const hintFor = (
+  context: jest.MatcherContext,
+  matcherName: string,
+  expectedProps: Record<string, unknown> | undefined,
+): string =>
+  context.utils.matcherHint(matcherName, undefined, "ErrorClass", {
+    isNot: context.isNot,
+    promise: context.promise,
+    secondArgument: expectedProps ? "properties" : undefined,
+  })
+
+const describeMismatch = (
+  context: jest.MatcherContext,
+  subject: Error,
+  expectedProps: Record<string, unknown>,
+): string => {
+  const printableExpected: Record<string, unknown> = {}
+  const printableReceived: Record<string, unknown> = {}
+  const mismatched: string[] = []
+  const unreadable: string[] = []
+
+  for (const [key, value] of Object.entries(expectedProps)) {
+    printableExpected[key] = printable(value)
+    try {
+      const actual = (subject as any)[key]
+      if (context.equals(actual, value)) {
+        printableReceived[key] = printableExpected[key]
+      } else {
+        printableReceived[key] = printable(actual)
+        mismatched.push(key)
+      }
+    } catch (e) {
+      printableReceived[key] = printable(e)
+      mismatched.push(key)
+      unreadable.push(key)
+    }
+  }
+
+  const lines = [
+    `Received ${RECEIVED_COLOR(className(subject))} has mismatched properties: ${mismatched.join(", ")}`,
+  ]
+  if (unreadable.length > 0) {
+    lines.push(`Threw when compared: ${unreadable.join(", ")}`)
+  }
+  return (
+    lines.join("\n") +
+    "\n\n" +
+    context.utils.printDiffOrStringify(
+      printableExpected,
+      printableReceived,
+      "Expected properties",
+      "Received properties",
+      context.expand !== false,
+    )
+  )
 }
 
 const checkErrorInstance = (
@@ -45,19 +97,11 @@ const checkErrorInstance = (
   ErrorClass: ErrorClass,
   expectedProps: Record<string, unknown> | undefined,
 ): jest.CustomMatcherResult => {
-  const { matcherHint, printExpected, printReceived, printDiffOrStringify } =
-    context.utils
-  const hint = matcherHint(matcherName, undefined, "ErrorClass", {
-    isNot: context.isNot,
-    promise: context.promise,
-    secondArgument: expectedProps ? "properties" : undefined,
-  })
-
   if (!(subject instanceof ErrorClass)) {
     return {
       pass: false,
       message: () =>
-        `${hint}\n\n` +
+        `${hintFor(context, matcherName, expectedProps)}\n\n` +
         `Expected class: ${EXPECTED_COLOR(ErrorClass.name)}\n` +
         describeReceived(context, subject),
     }
@@ -67,50 +111,39 @@ const checkErrorInstance = (
     return {
       pass: true,
       message: () =>
-        `${hint}\n\n` +
+        `${hintFor(context, matcherName, expectedProps)}\n\n` +
         `Expected: not an instance of ${EXPECTED_COLOR(ErrorClass.name)}\n` +
-        `Received: ${printReceived(printable(subject))}`,
+        `Received: ${context.utils.printReceived(printable(subject))}`,
     }
   }
 
-  const keys = Object.keys(expectedProps)
-  const printableExpected: Record<string, unknown> = {}
-  const printableReceived: Record<string, unknown> = {}
-  const mismatched: string[] = []
-  for (const key of keys) {
-    const actual = (subject as any)[key]
-    printableExpected[key] = printable(expectedProps[key])
-    if (context.equals(actual, expectedProps[key])) {
-      printableReceived[key] = printableExpected[key]
-    } else {
-      printableReceived[key] = printable(actual)
-      mismatched.push(key)
-    }
-  }
+  const pass = Object.entries(expectedProps).every(([key, value]) =>
+    context.equals((subject as any)[key], value),
+  )
 
-  if (mismatched.length > 0) {
+  if (!pass) {
     return {
       pass: false,
       message: () =>
-        `${hint}\n\n` +
-        `Received ${RECEIVED_COLOR(subject.constructor.name)} has mismatched properties: ${mismatched.join(", ")}\n\n` +
-        printDiffOrStringify(
-          printableExpected,
-          printableReceived,
-          "Expected properties",
-          "Received properties",
-          context.expand !== false,
-        ),
+        `${hintFor(context, matcherName, expectedProps)}\n\n` +
+        describeMismatch(context, subject, expectedProps),
     }
   }
 
   return {
     pass: true,
     message: () =>
-      `${hint}\n\n` +
-      `Expected: not an instance of ${EXPECTED_COLOR(ErrorClass.name)} with properties ${printExpected(printableExpected)}\n` +
-      `Received: ${printReceived(printable(subject))}\n` +
-      `Matched properties: ${keys.join(", ")}`,
+      `${hintFor(context, matcherName, expectedProps)}\n\n` +
+      `Expected: not an instance of ${EXPECTED_COLOR(ErrorClass.name)} with properties ${context.utils.printExpected(
+        Object.fromEntries(
+          Object.entries(expectedProps).map(([key, value]) => [
+            key,
+            printable(value),
+          ]),
+        ),
+      )}\n` +
+      `Received: ${context.utils.printReceived(printable(subject))}\n` +
+      `Matched properties: ${Object.keys(expectedProps).join(", ")}`,
   }
 }
 

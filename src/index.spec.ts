@@ -36,6 +36,42 @@ class PublicError extends Error {
   }
 }
 
+class GetterError extends PublicError {
+  public get kind(): string {
+    return "getter"
+  }
+}
+
+const AnonymousError = ((): new (message: string) => Error =>
+  class extends Error {})()
+
+const throwingGetter = {
+  enumerable: true,
+  get: (): never => {
+    throw new Error("getter threw")
+  },
+}
+
+const causeWithThrowingGetter = Object.defineProperty(
+  new RawError("x"),
+  "boom",
+  throwingGetter,
+)
+
+const subjectWithThrowingGetter = Object.defineProperty(
+  new PublicError("access-lost"),
+  "boom",
+  throwingGetter,
+)
+
+const withoutConstructor = Object.defineProperty(
+  new PublicError("access-lost"),
+  "constructor",
+  { value: undefined },
+)
+
+const symbolKey = Symbol("key")
+
 describe("toThrowMatching", () => {
   it("should pass when function throws the expected error class", () => {
     expect(() => {
@@ -266,6 +302,43 @@ describe("toThrowMatching", () => {
           }).toThrowMatching(PublicError)
         }),
       ).toIncludeMultiple(["Expected class: PublicError", shown])
+    })
+
+    it("should fall back to the error's name when its constructor is undefined", () => {
+      expect(
+        failureMessage(() => {
+          expect(() => {
+            throw withoutConstructor
+          }).toThrowMatching(OtherError)
+        }),
+      ).toIncludeMultiple([
+        "Received class: Error",
+        'Received message: "public"',
+      ])
+    })
+
+    it("should name an anonymous error class by its error name", () => {
+      expect(
+        failureMessage(() => {
+          expect(() => {
+            throw new AnonymousError("anon")
+          }).toThrowMatching(PublicError)
+        }),
+      ).toIncludeMultiple(["Received class: Error", 'Received message: "anon"'])
+    })
+
+    it("should report a property whose getter throws as mismatched", () => {
+      expect(
+        failureMessage(() => {
+          expect(() => {
+            throw subjectWithThrowingGetter
+          }).toThrowMatching(PublicError, { reason: "zzz", boom: 1 })
+        }),
+      ).toIncludeMultiple([
+        "has mismatched properties: reason, boom",
+        "Threw when compared: boom",
+        '+   "boom": [Error: getter threw],',
+      ])
     })
 
     it("should say which properties matched when negated", () => {
@@ -501,6 +574,40 @@ describe("toMatchError", () => {
       ).toIncludeMultiple(["Expected class: PublicError", shown])
     })
 
+    it("should fall back to the error's name when its constructor is undefined", () => {
+      expect(
+        failureMessage(() => {
+          expect(withoutConstructor).toMatchError(OtherError)
+        }),
+      ).toIncludeMultiple([
+        "Received class: Error",
+        'Received message: "public"',
+      ])
+    })
+
+    it("should name an anonymous error class by its error name", () => {
+      expect(
+        failureMessage(() => {
+          expect(new AnonymousError("anon")).toMatchError(PublicError)
+        }),
+      ).toIncludeMultiple(["Received class: Error", 'Received message: "anon"'])
+    })
+
+    it("should report a property whose getter throws as mismatched", () => {
+      expect(
+        failureMessage(() => {
+          expect(subjectWithThrowingGetter).toMatchError(PublicError, {
+            reason: "zzz",
+            boom: 1,
+          })
+        }),
+      ).toIncludeMultiple([
+        "has mismatched properties: reason, boom",
+        "Threw when compared: boom",
+        '+   "boom": [Error: getter threw],',
+      ])
+    })
+
     it("should say which properties matched when negated", () => {
       expect(
         failureMessage(() => {
@@ -539,6 +646,42 @@ describe("pass and fail outcomes", () => {
 
   const passing: [string, unknown, new (...args: any[]) => Error, object?][] = [
     ["the class alone", error, PublicError, undefined],
+    [
+      "an error whose constructor is undefined",
+      withoutConstructor,
+      PublicError,
+      { reason: "access-lost" },
+    ],
+    [
+      "an anonymous error class",
+      new AnonymousError("anon"),
+      AnonymousError,
+      undefined,
+    ],
+    [
+      "undefined expected for an absent property",
+      error,
+      PublicError,
+      { code: undefined },
+    ],
+    [
+      "an inherited property",
+      Object.create(error),
+      PublicError,
+      { reason: "access-lost" },
+    ],
+    [
+      "a getter property",
+      new GetterError("access-lost"),
+      PublicError,
+      { kind: "getter" },
+    ],
+    [
+      "a symbol-keyed property, which is not compared",
+      error,
+      PublicError,
+      { [symbolKey]: "anything" },
+    ],
     ["a base class", error, Error, undefined],
     ["no properties", error, PublicError, {}],
     ["one matching property", error, PublicError, { reason: "access-lost" }],
@@ -569,6 +712,30 @@ describe("pass and fail outcomes", () => {
   ]
 
   const failing: [string, unknown, new (...args: any[]) => Error, object?][] = [
+    [
+      "a non-Error subject with properties",
+      { reason: "access-lost" },
+      PublicError,
+      { reason: "access-lost" },
+    ],
+    [
+      "a mismatched getter property",
+      new GetterError("access-lost"),
+      PublicError,
+      { kind: "other" },
+    ],
+    [
+      "a mismatch alongside a cause with a throwing getter",
+      error,
+      PublicError,
+      { reason: "nope", cause: causeWithThrowingGetter },
+    ],
+    [
+      "a mismatch before a property whose getter throws",
+      subjectWithThrowingGetter,
+      PublicError,
+      { reason: "zzz", boom: 1 },
+    ],
     ["another class", new OtherError("boom"), PublicError, undefined],
     ["a base class instance", new Error("boom"), PublicError, undefined],
     ["a string", "boom", PublicError, undefined],
