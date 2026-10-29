@@ -1,4 +1,15 @@
+import { stripVTControlCharacters } from "node:util"
+
 import "./index"
+
+const failureMessage = (assertion: () => void): string => {
+  try {
+    assertion()
+  } catch (e) {
+    return stripVTControlCharacters((e as Error).message)
+  }
+  throw new Error("Expected the assertion to fail, but it passed")
+}
 
 class TestError extends Error {
   public constructor(
@@ -43,7 +54,7 @@ describe("toThrowMatching", () => {
       expect(() => {
         throw new Error("wrong")
       }).toThrowMatching(TestError)
-    }).toThrow(/Expected.*TestError.*got.*Error/)
+    }).toThrow(/Expected class: .*TestError[\s\S]*Received class: .*Error/)
   })
 
   it("should fail when function does not throw", () => {
@@ -145,6 +156,150 @@ describe("toThrowMatching", () => {
     })
     /* eslint-enable jest/max-expects */
   })
+
+  /* eslint-disable jest/max-expects --
+   * Failure-message tests: the inner expect invokes the matcher so that
+   * failureMessage can capture its AssertionError; the outer expect asserts
+   * on that message. Two expects are intrinsic to the pattern.
+   */
+  describe("failure messages", () => {
+    const error = new PublicError(
+      "access-lost",
+      new OtherError("downstream said no"),
+    )
+
+    it("should show both causes' class and message when the cause does not match expect.any", () => {
+      expect(
+        failureMessage(() => {
+          expect(() => {
+            throw error
+          }).toThrowMatching(PublicError, { cause: expect.any(RawError) })
+        }),
+      ).toIncludeMultiple([
+        '-   "cause": Any<RawError>,',
+        '+   "cause": [OtherError: downstream said no],',
+      ])
+    })
+
+    it("should show both causes' class and message when the cause does not equal an error", () => {
+      expect(
+        failureMessage(() => {
+          expect(() => {
+            throw error
+          }).toThrowMatching(PublicError, { cause: new RawError("x") })
+        }),
+      ).toIncludeMultiple([
+        '-   "cause": [RawError: x],',
+        '+   "cause": [OtherError: downstream said no],',
+      ])
+    })
+
+    it("should report every mismatched property in one message", () => {
+      expect(
+        failureMessage(() => {
+          expect(() => {
+            throw error
+          }).toThrowMatching(PublicError, { reason: "quota", message: "nope" })
+        }),
+      ).toIncludeMultiple([
+        "Received PublicError has mismatched properties: reason, message",
+        '-   "reason": "quota",',
+        '+   "reason": "access-lost",',
+        '-   "message": "nope",',
+        '+   "message": "public",',
+      ])
+    })
+
+    it("should show matching properties as unchanged in the diff", () => {
+      expect(
+        failureMessage(() => {
+          expect(() => {
+            throw error
+          }).toThrowMatching(PublicError, {
+            reason: "access-lost",
+            message: "nope",
+          })
+        }),
+      ).toIncludeMultiple([
+        "has mismatched properties: message\n",
+        '    "reason": "access-lost",',
+      ])
+    })
+
+    it("should show the received class and message on a class mismatch", () => {
+      expect(
+        failureMessage(() => {
+          expect(() => {
+            throw new OtherError("boom")
+          }).toThrowMatching(PublicError)
+        }),
+      ).toIncludeMultiple([
+        "Expected class: PublicError",
+        "Received class: OtherError",
+        'Received message: "boom"',
+      ])
+    })
+
+    it("should show the received cause on a class mismatch when there is one", () => {
+      expect(
+        failureMessage(() => {
+          expect(() => {
+            throw new OtherError("boom", { cause: new RawError("raw") })
+          }).toThrowMatching(PublicError)
+        }),
+      ).toInclude("Received cause: [RawError: raw]")
+    })
+
+    it.each([
+      ["a string", "boom", 'Received value: "boom"'],
+      ["undefined", undefined, "Received value: undefined"],
+      [
+        "a plain object",
+        { reason: "quota" },
+        'Received value: {"reason": "quota"}',
+      ],
+    ])("should show the received value when given %s", (_, subject, shown) => {
+      expect(
+        failureMessage(() => {
+          expect(() => {
+            throw subject
+          }).toThrowMatching(PublicError)
+        }),
+      ).toIncludeMultiple(["Expected class: PublicError", shown])
+    })
+
+    it("should say which properties matched when negated", () => {
+      expect(
+        failureMessage(() => {
+          expect(() => {
+            throw error
+          }).not.toThrowMatching(PublicError, {
+            reason: "access-lost",
+            cause: expect.any(OtherError),
+          })
+        }),
+      ).toIncludeMultiple([
+        "expect(received).not.toThrowMatching(ErrorClass, properties)",
+        'Expected: not an instance of PublicError with properties {"cause": Any<OtherError>, "reason": "access-lost"}',
+        "Received: [PublicError: public]",
+        "Matched properties: reason, cause",
+      ])
+    })
+
+    it("should show the received error when negated without properties", () => {
+      expect(
+        failureMessage(() => {
+          expect(() => {
+            throw error
+          }).not.toThrowMatching(PublicError)
+        }),
+      ).toIncludeMultiple([
+        "Expected: not an instance of PublicError",
+        "Received: [PublicError: public]",
+      ])
+    })
+  })
+  /* eslint-enable jest/max-expects */
 })
 
 describe("toMatchError", () => {
@@ -165,7 +320,7 @@ describe("toMatchError", () => {
   it("should fail when error is not the expected class", () => {
     expect(() => {
       expect(new Error("wrong")).toMatchError(TestError)
-    }).toThrow(/Expected.*TestError.*got.*Error/)
+    }).toThrow(/Expected class: .*TestError[\s\S]*Received class: .*Error/)
   })
 
   it("should reject function subjects with a clear error", () => {
@@ -241,6 +396,139 @@ describe("toMatchError", () => {
     })
     /* eslint-enable jest/max-expects */
   })
+
+  /* eslint-disable jest/max-expects --
+   * Failure-message tests: the inner expect invokes the matcher so that
+   * failureMessage can capture its AssertionError; the outer expect asserts
+   * on that message. Two expects are intrinsic to the pattern.
+   */
+  describe("failure messages", () => {
+    const error = new PublicError(
+      "access-lost",
+      new OtherError("downstream said no"),
+    )
+
+    it("should show both causes' class and message when the cause does not match expect.any", () => {
+      expect(
+        failureMessage(() => {
+          expect(error).toMatchError(PublicError, {
+            cause: expect.any(RawError),
+          })
+        }),
+      ).toIncludeMultiple([
+        '-   "cause": Any<RawError>,',
+        '+   "cause": [OtherError: downstream said no],',
+      ])
+    })
+
+    it("should show both causes' class and message when the cause does not equal an error", () => {
+      expect(
+        failureMessage(() => {
+          expect(error).toMatchError(PublicError, { cause: new RawError("x") })
+        }),
+      ).toIncludeMultiple([
+        '-   "cause": [RawError: x],',
+        '+   "cause": [OtherError: downstream said no],',
+      ])
+    })
+
+    it("should report every mismatched property in one message", () => {
+      expect(
+        failureMessage(() => {
+          expect(error).toMatchError(PublicError, {
+            reason: "quota",
+            message: "nope",
+          })
+        }),
+      ).toIncludeMultiple([
+        "Received PublicError has mismatched properties: reason, message",
+        '-   "reason": "quota",',
+        '+   "reason": "access-lost",',
+        '-   "message": "nope",',
+        '+   "message": "public",',
+      ])
+    })
+
+    it("should show matching properties as unchanged in the diff", () => {
+      expect(
+        failureMessage(() => {
+          expect(error).toMatchError(PublicError, {
+            reason: "access-lost",
+            message: "nope",
+          })
+        }),
+      ).toIncludeMultiple([
+        "has mismatched properties: message\n",
+        '    "reason": "access-lost",',
+      ])
+    })
+
+    it("should show the received class and message on a class mismatch", () => {
+      expect(
+        failureMessage(() => {
+          expect(new OtherError("boom")).toMatchError(PublicError)
+        }),
+      ).toIncludeMultiple([
+        "Expected class: PublicError",
+        "Received class: OtherError",
+        'Received message: "boom"',
+      ])
+    })
+
+    it("should show the received cause on a class mismatch when there is one", () => {
+      expect(
+        failureMessage(() => {
+          expect(
+            new OtherError("boom", { cause: new RawError("raw") }),
+          ).toMatchError(PublicError)
+        }),
+      ).toInclude("Received cause: [RawError: raw]")
+    })
+
+    it.each([
+      ["a string", "boom", 'Received value: "boom"'],
+      ["undefined", undefined, "Received value: undefined"],
+      [
+        "a plain object",
+        { reason: "quota" },
+        'Received value: {"reason": "quota"}',
+      ],
+    ])("should show the received value when given %s", (_, subject, shown) => {
+      expect(
+        failureMessage(() => {
+          expect(subject).toMatchError(PublicError)
+        }),
+      ).toIncludeMultiple(["Expected class: PublicError", shown])
+    })
+
+    it("should say which properties matched when negated", () => {
+      expect(
+        failureMessage(() => {
+          expect(error).not.toMatchError(PublicError, {
+            reason: "access-lost",
+            cause: expect.any(OtherError),
+          })
+        }),
+      ).toIncludeMultiple([
+        "expect(received).not.toMatchError(ErrorClass, properties)",
+        'Expected: not an instance of PublicError with properties {"cause": Any<OtherError>, "reason": "access-lost"}',
+        "Received: [PublicError: public]",
+        "Matched properties: reason, cause",
+      ])
+    })
+
+    it("should show the received error when negated without properties", () => {
+      expect(
+        failureMessage(() => {
+          expect(error).not.toMatchError(PublicError)
+        }),
+      ).toIncludeMultiple([
+        "Expected: not an instance of PublicError",
+        "Received: [PublicError: public]",
+      ])
+    })
+  })
+  /* eslint-enable jest/max-expects */
 })
 
 describe("pass and fail outcomes", () => {

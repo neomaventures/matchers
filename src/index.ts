@@ -1,47 +1,116 @@
 import { EXPECTED_COLOR, RECEIVED_COLOR } from "jest-matcher-utils"
 
-type EqualsFn = (a: unknown, b: unknown) => boolean
+type ErrorClass = new (...args: any[]) => Error
+
+const printable = (value: unknown): unknown => {
+  if (!(value instanceof Error)) {
+    return value
+  }
+
+  const copy = Object.assign(
+    Object.create(Object.getPrototypeOf(value) as object) as Error,
+    value,
+  )
+  Object.defineProperties(copy, {
+    name: { value: value.constructor.name },
+    message: { value: value.message },
+  })
+  return copy
+}
+
+const describeReceived = (
+  context: jest.MatcherContext,
+  subject: unknown,
+): string => {
+  const { printReceived } = context.utils
+
+  if (!(subject instanceof Error)) {
+    return `Received value: ${printReceived(subject)}`
+  }
+
+  const lines = [
+    `Received class: ${RECEIVED_COLOR(subject.constructor.name)}`,
+    `Received message: ${printReceived(subject.message)}`,
+  ]
+  if (subject.cause !== undefined) {
+    lines.push(`Received cause: ${printReceived(printable(subject.cause))}`)
+  }
+  return lines.join("\n")
+}
 
 const checkErrorInstance = (
+  context: jest.MatcherContext,
+  matcherName: string,
   subject: unknown,
-  ErrorClass: new (...args: any[]) => Error,
+  ErrorClass: ErrorClass,
   expectedProps: Record<string, unknown> | undefined,
-  equals: EqualsFn,
 ): jest.CustomMatcherResult => {
-  // Check type
+  const { matcherHint, printExpected, printReceived, printDiffOrStringify } =
+    context.utils
+  const hint = matcherHint(matcherName, undefined, "ErrorClass", {
+    isNot: context.isNot,
+    promise: context.promise,
+    secondArgument: expectedProps ? "properties" : undefined,
+  })
+
   if (!(subject instanceof ErrorClass)) {
     return {
       pass: false,
       message: () =>
-        // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- falsy check is intentional for constructor name fallback
-        `Expected ${EXPECTED_COLOR(ErrorClass.name)} but got ${RECEIVED_COLOR((subject as any)?.constructor?.name || typeof subject)}`,
+        `${hint}\n\n` +
+        `Expected class: ${EXPECTED_COLOR(ErrorClass.name)}\n` +
+        describeReceived(context, subject),
     }
   }
 
-  // If no props specified, just type check passes
   if (!expectedProps) {
     return {
       pass: true,
-      message: () => `Expected not to be ${EXPECTED_COLOR(ErrorClass.name)}`,
+      message: () =>
+        `${hint}\n\n` +
+        `Expected: not an instance of ${EXPECTED_COLOR(ErrorClass.name)}\n` +
+        `Received: ${printReceived(printable(subject))}`,
     }
   }
 
-  // Check properties using Jest's equality engine so asymmetric matchers
-  // (expect.objectContaining, expect.any, expect.stringMatching, etc.) compose.
-  for (const [key, value] of Object.entries(expectedProps)) {
-    if (!equals((subject as any)[key], value)) {
-      return {
-        pass: false,
-        message: () =>
-          `Expected ${EXPECTED_COLOR(ErrorClass.name)} with ${EXPECTED_COLOR(`${key}: ${JSON.stringify(value)}`)}, got ${RECEIVED_COLOR(`${key}: ${JSON.stringify((subject as any)[key])}`)}`,
-      }
+  const keys = Object.keys(expectedProps)
+  const printableExpected: Record<string, unknown> = {}
+  const printableReceived: Record<string, unknown> = {}
+  const mismatched: string[] = []
+  for (const key of keys) {
+    const actual = (subject as any)[key]
+    printableExpected[key] = printable(expectedProps[key])
+    if (context.equals(actual, expectedProps[key])) {
+      printableReceived[key] = printableExpected[key]
+    } else {
+      printableReceived[key] = printable(actual)
+      mismatched.push(key)
+    }
+  }
+
+  if (mismatched.length > 0) {
+    return {
+      pass: false,
+      message: () =>
+        `${hint}\n\n` +
+        `Received ${RECEIVED_COLOR(subject.constructor.name)} has mismatched properties: ${mismatched.join(", ")}\n\n` +
+        printDiffOrStringify(
+          printableExpected,
+          printableReceived,
+          "Expected properties",
+          "Received properties",
+          context.expand !== false,
+        ),
     }
   }
 
   return {
     pass: true,
     message: () =>
-      `Expected not to be ${EXPECTED_COLOR(ErrorClass.name)} with given properties`,
+      `${hint}\n\n` +
+      `Expected: not an instance of ${EXPECTED_COLOR(ErrorClass.name)} with properties ${printExpected(printableExpected)}\n` +
+      `Received: ${printReceived(printable(subject))}\n` +
+      `Matched properties: ${keys.join(", ")}`,
   }
 }
 
@@ -67,7 +136,13 @@ function toThrowMatching(
         `Expected function to throw ${EXPECTED_COLOR(ErrorClass.name)}, but it did not throw`,
     }
   } catch (e) {
-    return checkErrorInstance(e, ErrorClass, expectedProps, this.equals)
+    return checkErrorInstance(
+      this,
+      "toThrowMatching",
+      e,
+      ErrorClass,
+      expectedProps,
+    )
   }
 }
 
@@ -85,7 +160,13 @@ function toMatchError(
     }
   }
 
-  return checkErrorInstance(subject, ErrorClass, expectedProps, this.equals)
+  return checkErrorInstance(
+    this,
+    "toMatchError",
+    subject,
+    ErrorClass,
+    expectedProps,
+  )
 }
 
 expect.extend({
