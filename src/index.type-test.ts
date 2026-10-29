@@ -22,13 +22,26 @@ expect({ error: new Error("other") }).toEqual({
   error: expect.not.toMatchError(TypeTestError, { code: "ERR" }),
 })
 
-expect({ run: (): void => {} }).toEqual({
+expect({
+  run: (): void => {
+    throw new TypeTestError("ERR")
+  },
+}).toEqual({
   run: expect.toThrowMatching(TypeTestError, { code: "ERR" }),
 })
 
 expect({ run: (): void => {} }).toEqual({
   run: expect.not.toThrowMatching(TypeTestError),
 })
+
+type Asymmetric = { asymmetricMatch(other: unknown): boolean }
+
+export const matchesError: Asymmetric = expect.toMatchError(TypeTestError)
+export const doesNotMatchError: Asymmetric =
+  expect.not.toMatchError(TypeTestError)
+export const throwsMatching: Asymmetric = expect.toThrowMatching(TypeTestError)
+export const doesNotThrowMatching: Asymmetric =
+  expect.not.toThrowMatching(TypeTestError)
 
 // @ts-expect-error the first argument must be a constructor
 expect.toMatchError("TypeTestError")
