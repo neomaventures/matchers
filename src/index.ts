@@ -210,35 +210,55 @@ expect.extend({
   toMatchError,
 })
 
+/**
+ * The matchers this package adds, shared by every form Jest exposes them in.
+ * `R` is what a call returns: the assertion result on `expect(value)`, or an
+ * asymmetric matcher on `expect` and `expect.not`.
+ */
+interface ErrorMatchers<R> {
+  /**
+   * Checks if a function throws an instance of an error class, optionally
+   * with specific properties. Property values may be Jest asymmetric
+   * matchers (e.g. `expect.objectContaining(...)`).
+   *
+   * Also usable as an asymmetric matcher inside another expectation, e.g.
+   * `expect(handlers).toEqual({ run: expect.toThrowMatching(TimeoutError) })`.
+   *
+   * @param ErrorClass The expected error class/constructor
+   * @param expectedProps Optional object of properties to match
+   */
+  toThrowMatching<T>(
+    ErrorClass: new (...args: any[]) => T,
+    expectedProps?: Partial<T> | Record<string, unknown>,
+  ): R
+
+  /**
+   * Checks if a value is an instance of an error class, optionally
+   * with specific properties. Property values may be Jest asymmetric
+   * matchers (e.g. `expect.objectContaining(...)`).
+   *
+   * Also usable as an asymmetric matcher inside another expectation, e.g.
+   * `expect(result).toEqual({ error: expect.toMatchError(NotFoundException) })`.
+   *
+   * @param ErrorClass The expected error class/constructor
+   * @param expectedProps Optional object of properties to match
+   */
+  toMatchError<T>(
+    ErrorClass: new (...args: any[]) => T,
+    expectedProps?: Partial<T> | Record<string, unknown>,
+  ): R
+}
+
 declare global {
   // eslint-disable-next-line @typescript-eslint/no-namespace -- Jest matcher augmentation requires namespace syntax
   namespace jest {
-    interface Matchers<R> {
-      /**
-       * Checks if a function throws an instance of an error class, optionally
-       * with specific properties. Property values may be Jest asymmetric
-       * matchers (e.g. `expect.objectContaining(...)`).
-       *
-       * @param ErrorClass The expected error class/constructor
-       * @param expectedProps Optional object of properties to match
-       */
-      toThrowMatching<T>(
-        ErrorClass: new (...args: any[]) => T,
-        expectedProps?: Partial<T> | Record<string, unknown>,
-      ): R
+    // eslint-disable-next-line @typescript-eslint/no-empty-object-type -- members come from ErrorMatchers
+    interface Matchers<R> extends ErrorMatchers<R> {}
 
-      /**
-       * Checks if a value is an instance of an error class, optionally
-       * with specific properties. Property values may be Jest asymmetric
-       * matchers (e.g. `expect.objectContaining(...)`).
-       *
-       * @param ErrorClass The expected error class/constructor
-       * @param expectedProps Optional object of properties to match
-       */
-      toMatchError<T>(
-        ErrorClass: new (...args: any[]) => T,
-        expectedProps?: Partial<T> | Record<string, unknown>,
-      ): R
-    }
+    // eslint-disable-next-line @typescript-eslint/no-empty-object-type -- members come from ErrorMatchers
+    interface Expect extends ErrorMatchers<any> {}
+
+    // eslint-disable-next-line @typescript-eslint/no-empty-object-type -- members come from ErrorMatchers
+    interface InverseAsymmetricMatchers extends ErrorMatchers<any> {}
   }
 }
