@@ -406,7 +406,7 @@ describe("toThrowMatching", () => {
             throw new Error("wrong")
           },
         }).toEqual({ run: expect.toThrowMatching(TestError) })
-      }).toThrow(/toEqual/)
+      }).toThrow(/toEqual[\s\S]*toThrowMatching</)
     })
 
     it("should fail toEqual with expect.not when the function throws the error class", () => {
@@ -416,7 +416,7 @@ describe("toThrowMatching", () => {
             throw new TestError("ERR")
           },
         }).toEqual({ run: expect.not.toThrowMatching(TestError) })
-      }).toThrow(/toEqual/)
+      }).toThrow(/toEqual[\s\S]*not\.toThrowMatching</)
     })
     /* eslint-enable jest/max-expects */
   })
@@ -571,7 +571,7 @@ describe("toMatchError", () => {
           expect({ error: new Error("wrong") }).toEqual({
             error: expect.toMatchError(TestError),
           })
-        }).toThrow(/toEqual/)
+        }).toThrow(/toEqual[\s\S]*toMatchError</)
       })
 
       it("should fail when properties do not match", () => {
@@ -579,7 +579,7 @@ describe("toMatchError", () => {
           expect({ error: new TestError("ACTUAL") }).toEqual({
             error: expect.toMatchError(TestError, { code: "EXPECTED" }),
           })
-        }).toThrow(/toEqual/)
+        }).toThrow(/toEqual[\s\S]*toMatchError</)
       })
 
       it("should fail when a property's asymmetric matcher does not match", () => {
@@ -596,7 +596,7 @@ describe("toMatchError", () => {
               inner: expect.any(TestError),
             }),
           })
-        }).toThrow(/toEqual/)
+        }).toThrow(/toEqual[\s\S]*toMatchError</)
       })
 
       it("should fail when the error cause does not match its asymmetric matcher", () => {
@@ -605,7 +605,7 @@ describe("toMatchError", () => {
           expect({ error }).toEqual({
             error: expect.toMatchError(Error, { cause: expect.any(TestError) }),
           })
-        }).toThrow(/toEqual/)
+        }).toThrow(/toEqual[\s\S]*toMatchError</)
       })
       /* eslint-enable jest/max-expects */
     })
@@ -635,7 +635,7 @@ describe("toMatchError", () => {
           }).toMatchObject({
             error: expect.toMatchError(TestError, { code: "EXPECTED" }),
           })
-        }).toThrow(/toMatchObject/)
+        }).toThrow(/toMatchObject[\s\S]*toMatchError</)
       })
       /* eslint-enable jest/max-expects */
     })
@@ -663,7 +663,7 @@ describe("toMatchError", () => {
             "sync",
             expect.toMatchError(TestError),
           )
-        }).toThrow(/toHaveBeenCalledWith/)
+        }).toThrow(/toHaveBeenCalledWith[\s\S]*toMatchError</)
       })
       /* eslint-enable jest/max-expects */
     })
@@ -691,7 +691,7 @@ describe("toMatchError", () => {
           expect({ error: new TestError("ERR_CODE") }).toEqual({
             error: expect.not.toMatchError(TestError, { code: "ERR_CODE" }),
           })
-        }).toThrow(/toEqual/)
+        }).toThrow(/toEqual[\s\S]*not\.toMatchError</)
       })
       /* eslint-enable jest/max-expects */
     })
