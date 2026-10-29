@@ -17,9 +17,9 @@ npm install --save-dev @neomaventures/matchers
 ```
 
 Register it in your Jest config. The import has no exports — it calls
-`expect.extend()` on load and augments the `jest.Matchers` interface, so the
-matchers and their types are available everywhere without importing them
-per file.
+`expect.extend()` on load and augments Jest's `jest.Matchers`, `jest.Expect`
+and `jest.InverseAsymmetricMatchers` interfaces, so the matchers and their
+types are available everywhere without importing them per file.
 
 ```json
 {
@@ -51,6 +51,29 @@ expect(() => service.register(email)).toThrowMatching(
 
 // Check an already-caught error
 expect(caughtError).toMatchError(NotFoundException, { message: 'Not found' })
+```
+
+Both matchers also work inside another expectation, the same way
+`expect.any(...)` does — in `toEqual`, `toMatchObject` and
+`toHaveBeenCalledWith`. Their property values may be asymmetric matchers too:
+
+```typescript
+// Check an error nested in a larger value
+expect(events).toEqual([
+  {
+    status: 'failed',
+    error: expect.toMatchError(PaymentDeclinedException, {
+      reason: 'insufficient-funds',
+      cause: expect.any(GatewayTimeoutError),
+    }),
+  },
+])
+
+// Check an error passed to a callback
+expect(onError).toHaveBeenCalledWith(expect.toMatchError(NotFoundException))
+
+// Check that a nested value is not a given error
+expect(result).toEqual({ error: expect.not.toMatchError(NotFoundException) })
 ```
 
 
