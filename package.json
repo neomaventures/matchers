@@ -2,6 +2,7 @@
   "name": "@neomaventures/matchers",
   "version": "0.1.0",
   "description": "Jest matchers for asserting an error's class and its properties in one assertion - toThrowMatching and toMatchError.",
+  "type": "commonjs",
   "author": "Daniel Bruce",
   "repository": {
     "type": "git",
@@ -31,6 +32,12 @@
   },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "require": "./dist/index.js"
+    }
+  },
   "files": [
     "dist",
     "README.md",
