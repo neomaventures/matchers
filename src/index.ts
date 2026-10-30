@@ -1,47 +1,152 @@
 import { EXPECTED_COLOR, RECEIVED_COLOR } from "jest-matcher-utils"
 
-type EqualsFn = (a: unknown, b: unknown) => boolean
+type ErrorClass = new (...args: any[]) => Error
+
+const className = (value: Error): string =>
+  value.constructor?.name || value.name || "Error"
+
+const expectedName = (ErrorClass: ErrorClass): string =>
+  ErrorClass.name || "an anonymous class"
+
+const printable = (value: unknown): unknown =>
+  value instanceof Error
+    ? Object.create(Object.getPrototypeOf(value) as object | null, {
+        name: { value: className(value) },
+        message: { value: value.message },
+      })
+    : value
+
+const describeReceived = (
+  context: jest.MatcherContext,
+  subject: unknown,
+): string => {
+  const { printReceived } = context.utils
+
+  if (!(subject instanceof Error)) {
+    return `Received: ${printReceived(subject)}`
+  }
+
+  const lines = [
+    `Received: an instance of ${RECEIVED_COLOR(className(subject))}`,
+    `Received message: ${printReceived(subject.message)}`,
+  ]
+  if (subject.cause !== undefined) {
+    lines.push(`Received cause: ${printReceived(printable(subject.cause))}`)
+  }
+  return lines.join("\n")
+}
+
+const hintFor = (
+  context: jest.MatcherContext,
+  matcherName: string,
+  expectedProps: Record<string, unknown> | undefined,
+): string =>
+  context.utils.matcherHint(matcherName, undefined, "ErrorClass", {
+    isNot: context.isNot,
+    promise: context.promise,
+    secondArgument: expectedProps ? "properties" : undefined,
+  })
+
+const describeMismatch = (
+  context: jest.MatcherContext,
+  subject: Error,
+  expectedProps: Record<string, unknown>,
+): string => {
+  const printableExpected: Record<string, unknown> = {}
+  const printableReceived: Record<string, unknown> = {}
+  const mismatched: string[] = []
+  const unreadable: string[] = []
+
+  for (const [key, value] of Object.entries(expectedProps)) {
+    printableExpected[key] = printable(value)
+    try {
+      const actual = (subject as any)[key]
+      if (context.equals(actual, value)) {
+        printableReceived[key] = printableExpected[key]
+      } else {
+        printableReceived[key] = printable(actual)
+        mismatched.push(key)
+      }
+    } catch (e) {
+      printableReceived[key] = printable(e)
+      mismatched.push(key)
+      unreadable.push(key)
+    }
+  }
+
+  const lines = [
+    `Received ${RECEIVED_COLOR(className(subject))} has mismatched properties: ${mismatched.sort().join(", ")}`,
+  ]
+  if (unreadable.length > 0) {
+    lines.push(`Threw when compared: ${unreadable.sort().join(", ")}`)
+  }
+  return (
+    lines.join("\n") +
+    "\n\n" +
+    context.utils.printDiffOrStringify(
+      printableExpected,
+      printableReceived,
+      "Expected properties",
+      "Received properties",
+      context.expand !== false,
+    )
+  )
+}
 
 const checkErrorInstance = (
+  context: jest.MatcherContext,
+  matcherName: string,
   subject: unknown,
-  ErrorClass: new (...args: any[]) => Error,
+  ErrorClass: ErrorClass,
   expectedProps: Record<string, unknown> | undefined,
-  equals: EqualsFn,
 ): jest.CustomMatcherResult => {
-  // Check type
   if (!(subject instanceof ErrorClass)) {
     return {
       pass: false,
       message: () =>
-        // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- falsy check is intentional for constructor name fallback
-        `Expected ${EXPECTED_COLOR(ErrorClass.name)} but got ${RECEIVED_COLOR((subject as any)?.constructor?.name || typeof subject)}`,
+        `${hintFor(context, matcherName, expectedProps)}\n\n` +
+        `Expected: an instance of ${EXPECTED_COLOR(expectedName(ErrorClass))}\n` +
+        describeReceived(context, subject),
     }
   }
 
-  // If no props specified, just type check passes
   if (!expectedProps) {
     return {
       pass: true,
-      message: () => `Expected not to be ${EXPECTED_COLOR(ErrorClass.name)}`,
+      message: () =>
+        `${hintFor(context, matcherName, expectedProps)}\n\n` +
+        `Expected: not an instance of ${EXPECTED_COLOR(expectedName(ErrorClass))}\n` +
+        describeReceived(context, subject),
     }
   }
 
-  // Check properties using Jest's equality engine so asymmetric matchers
-  // (expect.objectContaining, expect.any, expect.stringMatching, etc.) compose.
-  for (const [key, value] of Object.entries(expectedProps)) {
-    if (!equals((subject as any)[key], value)) {
-      return {
-        pass: false,
-        message: () =>
-          `Expected ${EXPECTED_COLOR(ErrorClass.name)} with ${EXPECTED_COLOR(`${key}: ${JSON.stringify(value)}`)}, got ${RECEIVED_COLOR(`${key}: ${JSON.stringify((subject as any)[key])}`)}`,
-      }
+  const pass = Object.entries(expectedProps).every(([key, value]) =>
+    context.equals((subject as any)[key], value),
+  )
+
+  if (!pass) {
+    return {
+      pass: false,
+      message: () =>
+        `${hintFor(context, matcherName, expectedProps)}\n\n` +
+        describeMismatch(context, subject, expectedProps),
     }
   }
 
   return {
     pass: true,
     message: () =>
-      `Expected not to be ${EXPECTED_COLOR(ErrorClass.name)} with given properties`,
+      `${hintFor(context, matcherName, expectedProps)}\n\n` +
+      `Expected: not an instance of ${EXPECTED_COLOR(expectedName(ErrorClass))} with properties ${context.utils.printExpected(
+        Object.fromEntries(
+          Object.entries(expectedProps).map(([key, value]) => [
+            key,
+            printable(value),
+          ]),
+        ),
+      )}\n` +
+      describeReceived(context, subject) +
+      `\nMatched properties: ${Object.keys(expectedProps).sort().join(", ")}`,
   }
 }
 
@@ -64,10 +169,16 @@ function toThrowMatching(
     return {
       pass: false,
       message: () =>
-        `Expected function to throw ${EXPECTED_COLOR(ErrorClass.name)}, but it did not throw`,
+        `Expected function to throw ${EXPECTED_COLOR(expectedName(ErrorClass))}, but it did not throw`,
     }
   } catch (e) {
-    return checkErrorInstance(e, ErrorClass, expectedProps, this.equals)
+    return checkErrorInstance(
+      this,
+      "toThrowMatching",
+      e,
+      ErrorClass,
+      expectedProps,
+    )
   }
 }
 
@@ -85,7 +196,13 @@ function toMatchError(
     }
   }
 
-  return checkErrorInstance(subject, ErrorClass, expectedProps, this.equals)
+  return checkErrorInstance(
+    this,
+    "toMatchError",
+    subject,
+    ErrorClass,
+    expectedProps,
+  )
 }
 
 expect.extend({
