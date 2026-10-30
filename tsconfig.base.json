@@ -13,9 +13,6 @@
     "forceConsistentCasingInFileNames": true,
     "noFallthroughCasesInSwitch": true,
     "esModuleInterop": true,
-    "types": ["node", "jest", "jest-extended"],
-    "paths": {
-      "fixtures/*": ["${configDir}/fixtures/*"]
-    }
+    "types": ["node", "jest", "jest-extended"]
   }
 }

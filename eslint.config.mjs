@@ -104,6 +104,23 @@ export default tseslint.config(
       "import-x/no-cycle": "error",
       // Prevent duplicate imports. prefer-inline pairs with consistent-type-imports to inline type specifiers.
       "import-x/no-duplicates": ["error", { "prefer-inline": true }],
+      // Every runtime import must be a declared dependency or peerDependency.
+      // includeTypes catches type-only imports, which still land in the
+      // emitted .d.ts and so are part of the published contract.
+      "import-x/no-extraneous-dependencies": [
+        "error",
+        {
+          devDependencies: [
+            "**/*.spec.ts",
+            "e2e/**",
+            "eslint.config.mjs",
+            "jest.config.js",
+          ],
+          optionalDependencies: false,
+          peerDependencies: true,
+          includeTypes: true,
+        },
+      ],
     },
   },
   // Jest — enforces spec-file best practices (no .only, no conditional expect,
