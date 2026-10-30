@@ -376,6 +376,50 @@ describe("toThrowMatching", () => {
     })
   })
   /* eslint-enable jest/max-expects */
+
+  describe("as an asymmetric matcher", () => {
+    it("should match a throwing function inside toEqual", () => {
+      expect({
+        run: (): void => {
+          throw new TestError("ERR_CODE")
+        },
+      }).toEqual({
+        run: expect.toThrowMatching(TestError, { code: "ERR_CODE" }),
+      })
+    })
+
+    it("should match a non-throwing function with expect.not inside toEqual", () => {
+      expect({ run: (): void => {} }).toEqual({
+        run: expect.not.toThrowMatching(TestError),
+      })
+    })
+
+    /* eslint-disable jest/max-expects --
+     * Matcher failure-mode tests: the outer expect captures the AssertionError
+     * raised by the expectation the matcher is nested in. Two expects are
+     * intrinsic to the pattern.
+     */
+    it("should fail toEqual when the function throws a different error class", () => {
+      expect(() => {
+        expect({
+          run: (): void => {
+            throw new Error("wrong")
+          },
+        }).toEqual({ run: expect.toThrowMatching(TestError) })
+      }).toThrow(/toEqual[\s\S]*toThrowMatching</)
+    })
+
+    it("should fail toEqual with expect.not when the function throws the error class", () => {
+      expect(() => {
+        expect({
+          run: (): void => {
+            throw new TestError("ERR")
+          },
+        }).toEqual({ run: expect.not.toThrowMatching(TestError) })
+      }).toThrow(/toEqual[\s\S]*not\.toThrowMatching</)
+    })
+    /* eslint-enable jest/max-expects */
+  })
 })
 
 describe("toMatchError", () => {
@@ -473,6 +517,184 @@ describe("toMatchError", () => {
       }).toThrow(/details/)
     })
     /* eslint-enable jest/max-expects */
+  })
+
+  describe("as an asymmetric matcher", () => {
+    describe("inside toEqual", () => {
+      it("should match the error class", () => {
+        expect({ error: new TestError("ERR") }).toEqual({
+          error: expect.toMatchError(TestError),
+        })
+      })
+
+      it("should match the error class and properties", () => {
+        expect({ error: new TestError("ERR_CODE") }).toEqual({
+          error: expect.toMatchError(TestError, { code: "ERR_CODE" }),
+        })
+      })
+
+      it("should match properties that are themselves asymmetric matchers", () => {
+        const error = new TestError(
+          "ERR_CODE",
+          undefined,
+          undefined,
+          undefined,
+          new TestError("INNER"),
+        )
+        expect([["failed", { error }]]).toEqual([
+          [
+            "failed",
+            {
+              error: expect.toMatchError(TestError, {
+                code: "ERR_CODE",
+                inner: expect.any(TestError),
+              }),
+            },
+          ],
+        ])
+      })
+
+      it("should match an error cause against an asymmetric matcher", () => {
+        const error = new Error("sync failed", { cause: new TestError("ERR") })
+        expect({ error }).toEqual({
+          error: expect.toMatchError(Error, { cause: expect.any(TestError) }),
+        })
+      })
+
+      /* eslint-disable jest/max-expects --
+       * Matcher failure-mode tests: the outer expect captures the
+       * AssertionError raised by the expectation the matcher is nested in.
+       * Two expects are intrinsic to the pattern.
+       */
+      it("should fail when the error is not the expected class", () => {
+        expect(() => {
+          expect({ error: new Error("wrong") }).toEqual({
+            error: expect.toMatchError(TestError),
+          })
+        }).toThrow(/toEqual[\s\S]*toMatchError</)
+      })
+
+      it("should fail when properties do not match", () => {
+        expect(() => {
+          expect({ error: new TestError("ACTUAL") }).toEqual({
+            error: expect.toMatchError(TestError, { code: "EXPECTED" }),
+          })
+        }).toThrow(/toEqual[\s\S]*toMatchError</)
+      })
+
+      it("should fail when a property's asymmetric matcher does not match", () => {
+        const error = new TestError(
+          "ERR",
+          undefined,
+          undefined,
+          undefined,
+          new Error("inner"),
+        )
+        expect(() => {
+          expect({ error }).toEqual({
+            error: expect.toMatchError(TestError, {
+              inner: expect.any(TestError),
+            }),
+          })
+        }).toThrow(/toEqual[\s\S]*toMatchError</)
+      })
+
+      it("should fail when the error cause does not match its asymmetric matcher", () => {
+        const error = new Error("sync failed", { cause: new Error("other") })
+        expect(() => {
+          expect({ error }).toEqual({
+            error: expect.toMatchError(Error, { cause: expect.any(TestError) }),
+          })
+        }).toThrow(/toEqual[\s\S]*toMatchError</)
+      })
+      /* eslint-enable jest/max-expects */
+    })
+
+    describe("inside toMatchObject", () => {
+      it("should match the error class and properties", () => {
+        expect({
+          status: "failed",
+          error: new TestError("ERR_CODE"),
+        }).toMatchObject({
+          error: expect.toMatchError(TestError, {
+            code: expect.stringMatching(/^ERR_/),
+          }),
+        })
+      })
+
+      /* eslint-disable jest/max-expects --
+       * Matcher failure-mode test: the outer expect captures the
+       * AssertionError raised by the expectation the matcher is nested in.
+       * Two expects are intrinsic to the pattern.
+       */
+      it("should fail when properties do not match", () => {
+        expect(() => {
+          expect({
+            status: "failed",
+            error: new TestError("ACTUAL"),
+          }).toMatchObject({
+            error: expect.toMatchError(TestError, { code: "EXPECTED" }),
+          })
+        }).toThrow(/toMatchObject[\s\S]*toMatchError</)
+      })
+      /* eslint-enable jest/max-expects */
+    })
+
+    describe("inside toHaveBeenCalledWith", () => {
+      it("should match an error passed as an argument", () => {
+        const onError = jest.fn()
+        onError("sync", new TestError("ERR_CODE"))
+        expect(onError).toHaveBeenCalledWith(
+          "sync",
+          expect.toMatchError(TestError, { code: "ERR_CODE" }),
+        )
+      })
+
+      /* eslint-disable jest/max-expects --
+       * Matcher failure-mode test: the outer expect captures the
+       * AssertionError raised by the expectation the matcher is nested in.
+       * Two expects are intrinsic to the pattern.
+       */
+      it("should fail when the argument is not the expected class", () => {
+        const onError = jest.fn()
+        onError("sync", new Error("wrong"))
+        expect(() => {
+          expect(onError).toHaveBeenCalledWith(
+            "sync",
+            expect.toMatchError(TestError),
+          )
+        }).toThrow(/toHaveBeenCalledWith[\s\S]*toMatchError</)
+      })
+      /* eslint-enable jest/max-expects */
+    })
+
+    describe("with expect.not", () => {
+      it("should match an error of a different class", () => {
+        expect({ error: new Error("other") }).toEqual({
+          error: expect.not.toMatchError(TestError),
+        })
+      })
+
+      it("should match an error whose properties differ", () => {
+        expect({ error: new TestError("ACTUAL") }).toEqual({
+          error: expect.not.toMatchError(TestError, { code: "EXPECTED" }),
+        })
+      })
+
+      /* eslint-disable jest/max-expects --
+       * Matcher failure-mode test: the outer expect captures the
+       * AssertionError raised by the expectation the matcher is nested in.
+       * Two expects are intrinsic to the pattern.
+       */
+      it("should fail when the error matches the class and properties", () => {
+        expect(() => {
+          expect({ error: new TestError("ERR_CODE") }).toEqual({
+            error: expect.not.toMatchError(TestError, { code: "ERR_CODE" }),
+          })
+        }).toThrow(/toEqual[\s\S]*not\.toMatchError</)
+      })
+      /* eslint-enable jest/max-expects */
+    })
   })
 
   /* eslint-disable jest/max-expects --
