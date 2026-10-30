@@ -208,7 +208,7 @@ function toMatchError(
 expect.extend({
   toThrowMatching,
   toMatchError,
-})
+} satisfies Record<keyof ErrorMatchers<unknown>, jest.CustomMatcher>)
 
 /**
  * The matchers this package adds, shared by every form Jest exposes them in.

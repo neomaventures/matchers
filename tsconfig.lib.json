@@ -8,5 +8,5 @@
     "composite": true
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "**/*spec.ts", "**/*.type-test.ts"]
+  "exclude": ["node_modules", "dist", "**/*spec.ts"]
 }

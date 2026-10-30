@@ -1,8 +1,0 @@
-{
-  "extends": "./tsconfig.base.json",
-  "compilerOptions": {
-    "noEmit": true,
-    "types": ["node", "jest"]
-  },
-  "files": ["src/index.ts", "src/index.type-test.ts"]
-}

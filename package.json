@@ -42,7 +42,7 @@
     "build": "tsc -p ./tsconfig.lib.json",
     "test": "jest --runInBand",
     "lint": "eslint .",
-    "typecheck": "tsc -p ./tsconfig.type-test.json && tsc --noEmit",
+    "typecheck": "tsc --noEmit",
     "prepublishOnly": "pnpm build"
   },
   "dependencies": {
